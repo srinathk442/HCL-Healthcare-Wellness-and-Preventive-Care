@@ -1,7 +1,12 @@
 # Environment and secrets
 .env
+<<<<<<< HEAD
 *.env
 !*.env.example
+=======
+.env.*
+!.env.example
+>>>>>>> 0deaa173abdaa2600b62897d17576ea30ddd2808
 
 # Python
 __pycache__/
@@ -12,7 +17,11 @@ venv/
 .venv/
 env/
 
+<<<<<<< HEAD
 # Node (if frontend in same repo)
+=======
+# Node
+>>>>>>> 0deaa173abdaa2600b62897d17576ea30ddd2808
 node_modules/
 
 # IDE / OS

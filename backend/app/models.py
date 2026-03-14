@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 from enum import Enum
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
@@ -79,3 +79,108 @@ class UserTokenData(BaseModel):
     user_id: str
     email: EmailStr
     role: RoleEnum
+
+
+# ── Wellness Goals ────────────────────────────────────────────────────────────
+
+class GoalTypeEnum(str, Enum):
+    steps = "steps"
+    water = "water"
+    sleep = "sleep"
+
+
+class UnitEnum(str, Enum):
+    steps = "steps"
+    glasses = "glasses"
+    hours = "hours"
+
+
+class GoalCreate(BaseModel):
+    goal_type: GoalTypeEnum
+    target_value: float = Field(gt=0)
+    unit: UnitEnum
+
+
+class GoalResponse(BaseModel):
+    id: str = Field(alias="_id")
+    patient_id: str
+    goal_type: GoalTypeEnum
+    target_value: float
+    unit: UnitEnum
+    is_active: bool
+    created_at: datetime
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
+class GoalLogCreate(BaseModel):
+    logged_value: float = Field(gt=0)
+    log_date: date
+
+
+class GoalLogResponse(BaseModel):
+    id: str = Field(alias="_id")
+    goal_id: str
+    patient_id: str
+    logged_value: float
+    log_date: date
+    created_at: datetime
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
+# ── Reminders ─────────────────────────────────────────────────────────────────
+
+class ReminderStatusEnum(str, Enum):
+    pending = "pending"
+    completed = "completed"
+    missed = "missed"
+
+
+class ReminderCategoryEnum(str, Enum):
+    checkup = "checkup"
+    vaccination = "vaccination"
+    lab = "lab"
+
+
+class ReminderResponse(BaseModel):
+    id: str = Field(alias="_id")
+    patient_id: str
+    title: str
+    description: str | None = None
+    due_date: date
+    status: ReminderStatusEnum
+    category: ReminderCategoryEnum
+    created_at: datetime
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
+class ReminderCreate(BaseModel):
+    title: str
+    description: str | None = None
+    due_date: date
+    category: ReminderCategoryEnum
+
+
+class ReminderStatusUpdate(BaseModel):
+    status: ReminderStatusEnum
+
+
+# ── Provider patient view ─────────────────────────────────────────────────────
+
+class PatientSummary(BaseModel):
+    patient_id: str
+    email: str
+    full_name: str | None = None
+    assigned_at: datetime
+
+
+class PatientComplianceResponse(BaseModel):
+    patient_id: str
+    email: str
+    full_name: str | None = None
+    total_goals: int
+    goals_with_recent_log: int
+    pending_reminders: int
+    missed_reminders: int

@@ -6,9 +6,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
 from app.db import close_mongo_connection, connect_to_mongo
 from app.routes.auth import router as auth_router
+from app.routes.goals import router as goals_router
 from app.routes.patient import router as patient_router
 from app.routes.provider import router as provider_router
 from app.routes.public import router as public_router
+from app.routes.reminders import router as reminders_router
 
 
 @asynccontextmanager
@@ -32,6 +34,8 @@ app.include_router(auth_router)
 app.include_router(patient_router)
 app.include_router(provider_router)
 app.include_router(public_router)
+app.include_router(goals_router)
+app.include_router(reminders_router)
 
 
 @app.get("/")
