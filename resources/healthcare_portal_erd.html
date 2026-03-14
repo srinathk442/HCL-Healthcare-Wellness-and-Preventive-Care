@@ -1,0 +1,128 @@
+
+<style>
+#erd svg { width: 100%; }
+</style>
+<div id="erd"></div>
+<script type="module">
+import mermaid from 'https://esm.sh/mermaid@11/dist/mermaid.esm.min.mjs';
+const dark = matchMedia('(prefers-color-scheme: dark)').matches;
+await document.fonts.ready;
+mermaid.initialize({
+  startOnLoad: false,
+  theme: 'base',
+  fontFamily: '"Anthropic Sans", sans-serif',
+  themeVariables: {
+    darkMode: dark,
+    fontSize: '13px',
+    fontFamily: '"Anthropic Sans", sans-serif',
+    lineColor: dark ? '#9c9a92' : '#73726c',
+    textColor: dark ? '#c2c0b6' : '#3d3d3a',
+  },
+});
+const { svg } = await mermaid.render('erd-svg', `erDiagram
+  USERS ||--o{ PROVIDER_PATIENT : "assigned as provider"
+  USERS ||--o{ PROVIDER_PATIENT : "has as patient"
+  USERS ||--|| PROFILES : "has"
+  USERS ||--o{ WELLNESS_GOALS : "owns"
+  USERS ||--o{ REMINDERS : "has"
+  USERS ||--o{ AUDIT_LOGS : "generates"
+  WELLNESS_GOALS ||--o{ GOAL_LOGS : "has entries"
+
+  USERS {
+    ObjectId _id PK
+    string email UK
+    string password_hash
+    string role "patient or provider"
+    boolean is_active
+    boolean consent_given
+    datetime created_at
+    datetime updated_at
+  }
+
+  PROFILES {
+    ObjectId _id PK
+    ObjectId user_id FK
+    string full_name
+    int age
+    string gender
+    string phone
+    array allergies
+    array current_medications
+    string blood_type
+    string emergency_contact
+    datetime updated_at
+  }
+
+  WELLNESS_GOALS {
+    ObjectId _id PK
+    ObjectId patient_id FK
+    string goal_type "steps, water, sleep"
+    float target_value
+    string unit "steps, glasses, hours"
+    boolean is_active
+    datetime created_at
+  }
+
+  GOAL_LOGS {
+    ObjectId _id PK
+    ObjectId goal_id FK
+    ObjectId patient_id FK
+    float logged_value
+    date log_date
+    datetime created_at
+  }
+
+  REMINDERS {
+    ObjectId _id PK
+    ObjectId patient_id FK
+    string title
+    string description
+    date due_date
+    string status "pending, completed, missed"
+    string category "checkup, vaccination, lab"
+    datetime created_at
+  }
+
+  PROVIDER_PATIENT {
+    ObjectId _id PK
+    ObjectId provider_id FK
+    ObjectId patient_id FK
+    datetime assigned_at
+    boolean is_active
+  }
+
+  AUDIT_LOGS {
+    ObjectId _id PK
+    ObjectId user_id FK
+    string action
+    string resource
+    string ip_address
+    datetime timestamp
+  }
+`);
+document.getElementById('erd').innerHTML = svg;
+
+document.querySelectorAll('#erd svg .node').forEach(node => {
+  const firstPath = node.querySelector('path[d]');
+  if (!firstPath) return;
+  const d = firstPath.getAttribute('d');
+  const nums = d.match(/-?[\d.]+/g)?.map(Number);
+  if (!nums || nums.length < 8) return;
+  const xs = [nums[0], nums[2], nums[4], nums[6]];
+  const ys = [nums[1], nums[3], nums[5], nums[7]];
+  const x = Math.min(...xs), y = Math.min(...ys);
+  const w = Math.max(...xs) - x, h = Math.max(...ys) - y;
+  const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+  rect.setAttribute('x', x); rect.setAttribute('y', y);
+  rect.setAttribute('width', w); rect.setAttribute('height', h);
+  rect.setAttribute('rx', '8');
+  for (const a of ['fill', 'stroke', 'stroke-width', 'class', 'style']) {
+    if (firstPath.hasAttribute(a)) rect.setAttribute(a, firstPath.getAttribute(a));
+  }
+  firstPath.replaceWith(rect);
+});
+
+document.querySelectorAll('#erd svg .row-rect-odd path, #erd svg .row-rect-even path').forEach(p => {
+  p.setAttribute('stroke', 'none');
+});
+</script>
