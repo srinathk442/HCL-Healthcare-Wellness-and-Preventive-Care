@@ -66,6 +66,10 @@ Healthcare providers can monitor patient compliance, view wellness goal progress
 | `provider_patient`  | Many-to-many mapping of providers to patients        |
 | `audit_logs`        | HIPAA-style access logging for all data actions      |
 
+> **Role distinction:** A single `USERS` collection serves both patients and providers.
+> The `role` field (enum: `patient` | `provider`) controls access at the API level and
+> determines which relationships and dashboards are available to that user.
+
 ---
 
 ### Schema Details
@@ -84,11 +88,16 @@ Healthcare providers can monitor patient compliance, view wellness goal progress
 }
 ```
 
+> `role` is set at registration and cannot be changed by the user.
+> All downstream collections reference this field to enforce access control:
+> - `role = patient` → has access to `profiles`, `wellness_goals`, `goal_logs`, `reminders`
+> - `role = provider` → has access to `provider_patient` assignments and read-only patient data
+
 #### `profiles`
 ```json
 {
   "_id": "ObjectId",
-  "user_id": "ObjectId (ref: users)",
+  "user_id": "ObjectId (ref: users where role=patient)",
   "full_name": "string",
   "age": "integer",
   "gender": "string",
@@ -105,7 +114,7 @@ Healthcare providers can monitor patient compliance, view wellness goal progress
 ```json
 {
   "_id": "ObjectId",
-  "patient_id": "ObjectId (ref: users)",
+  "patient_id": "ObjectId (ref: users where role=patient)",
   "goal_type": "enum: ['steps', 'water', 'sleep']",
   "target_value": "float",
   "unit": "enum: ['steps', 'glasses', 'hours']",
@@ -119,7 +128,7 @@ Healthcare providers can monitor patient compliance, view wellness goal progress
 {
   "_id": "ObjectId",
   "goal_id": "ObjectId (ref: wellness_goals)",
-  "patient_id": "ObjectId (ref: users)",
+  "patient_id": "ObjectId (ref: users where role=patient)",
   "logged_value": "float",
   "log_date": "date (YYYY-MM-DD)",
   "created_at": "datetime"
@@ -130,7 +139,7 @@ Healthcare providers can monitor patient compliance, view wellness goal progress
 ```json
 {
   "_id": "ObjectId",
-  "patient_id": "ObjectId (ref: users)",
+  "patient_id": "ObjectId (ref: users where role=patient)",
   "title": "string",
   "description": "string",
   "due_date": "date",
@@ -144,8 +153,8 @@ Healthcare providers can monitor patient compliance, view wellness goal progress
 ```json
 {
   "_id": "ObjectId",
-  "provider_id": "ObjectId (ref: users)",
-  "patient_id": "ObjectId (ref: users)",
+  "provider_id": "ObjectId (ref: users where role=provider)",
+  "patient_id": "ObjectId (ref: users where role=patient)",
   "assigned_at": "datetime",
   "is_active": "boolean"
 }
@@ -156,6 +165,7 @@ Healthcare providers can monitor patient compliance, view wellness goal progress
 {
   "_id": "ObjectId",
   "user_id": "ObjectId (ref: users)",
+  "user_role": "enum: ['patient', 'provider']",
   "action": "string (e.g., 'VIEW_PROFILE', 'UPDATE_GOAL')",
   "resource": "string (e.g., 'profiles', 'wellness_goals')",
   "ip_address": "string",
@@ -163,11 +173,18 @@ Healthcare providers can monitor patient compliance, view wellness goal progress
 }
 ```
 
+> `user_role` is stored directly on each audit log entry so the access trail is
+> self-contained and does not require a join back to `users` to understand who did what.
+
 ---
 
 ### ER Diagram
 
 > Rendered natively by GitHub — no plugins needed.
+>
+> **How to read the roles:** `USERS` is a single collection. The `role` field
+> (`patient` | `provider`) determines what each user can own or be linked to.
+> Relationships labelled `[patient]` or `[provider]` show which role that FK targets.
 
 ```mermaid
 erDiagram
@@ -175,7 +192,7 @@ erDiagram
         ObjectId _id PK
         string email UK
         string password_hash
-        string role
+        string role "patient | provider"
         boolean is_active
         boolean consent_given
         datetime created_at
@@ -184,7 +201,7 @@ erDiagram
 
     PROFILES {
         ObjectId _id PK
-        ObjectId user_id FK
+        ObjectId user_id FK "ref: USERS(role=patient)"
         string full_name
         int age
         string gender
@@ -198,10 +215,10 @@ erDiagram
 
     WELLNESS_GOALS {
         ObjectId _id PK
-        ObjectId patient_id FK
-        string goal_type
+        ObjectId patient_id FK "ref: USERS(role=patient)"
+        string goal_type "steps | water | sleep"
         float target_value
-        string unit
+        string unit "steps | glasses | hours"
         boolean is_active
         datetime created_at
     }
@@ -209,7 +226,7 @@ erDiagram
     GOAL_LOGS {
         ObjectId _id PK
         ObjectId goal_id FK
-        ObjectId patient_id FK
+        ObjectId patient_id FK "ref: USERS(role=patient)"
         float logged_value
         date log_date
         datetime created_at
@@ -217,19 +234,19 @@ erDiagram
 
     REMINDERS {
         ObjectId _id PK
-        ObjectId patient_id FK
+        ObjectId patient_id FK "ref: USERS(role=patient)"
         string title
         string description
         date due_date
-        string status
-        string category
+        string status "pending | completed | missed"
+        string category "checkup | vaccination | lab"
         datetime created_at
     }
 
     PROVIDER_PATIENT {
         ObjectId _id PK
-        ObjectId provider_id FK
-        ObjectId patient_id FK
+        ObjectId provider_id FK "ref: USERS(role=provider)"
+        ObjectId patient_id FK "ref: USERS(role=patient)"
         datetime assigned_at
         boolean is_active
     }
@@ -237,26 +254,29 @@ erDiagram
     AUDIT_LOGS {
         ObjectId _id PK
         ObjectId user_id FK
+        string user_role "patient | provider"
         string action
         string resource
         string ip_address
         datetime timestamp
     }
 
-    USERS ||--|| PROFILES : "has"
-    USERS ||--o{ WELLNESS_GOALS : "owns"
-    USERS ||--o{ REMINDERS : "has"
-    USERS ||--o{ AUDIT_LOGS : "generates"
-    USERS ||--o{ PROVIDER_PATIENT : "assigned as provider"
-    USERS ||--o{ PROVIDER_PATIENT : "has as patient"
-    WELLNESS_GOALS ||--o{ GOAL_LOGS : "has entries"
+    USERS ||--|| PROFILES             : "patient has profile"
+    USERS ||--o{ WELLNESS_GOALS       : "patient owns goals"
+    USERS ||--o{ REMINDERS            : "patient has reminders"
+    USERS ||--o{ AUDIT_LOGS           : "user generates logs"
+    USERS ||--o{ PROVIDER_PATIENT     : "provider is assigned"
+    USERS ||--o{ PROVIDER_PATIENT     : "patient is assigned to"
+    WELLNESS_GOALS ||--o{ GOAL_LOGS   : "goal has daily entries"
 ```
 
 **Indexes:**
 - `users.email` — unique index
+- `users.role` — index for role-based filtering at the API layer
 - `goal_logs.patient_id + log_date` — compound index for dashboard queries
 - `reminders.patient_id + due_date` — compound index for upcoming reminder queries
 - `audit_logs.user_id + timestamp` — compound index for audit trail queries
+- `provider_patient.provider_id + patient_id` — compound unique index to prevent duplicate assignments
 
 ---
 
@@ -377,9 +397,9 @@ VITE_API_BASE_URL=http://localhost:8000
 
 - **Password hashing** — bcrypt via `passlib`
 - **JWT tokens** — signed HS256 tokens with expiry, issued on login
-- **Role-based access control** — route-level guards for `patient` vs `provider` roles
+- **Role-based access control** — `role` field in JWT payload; every protected route checks role before granting access
 - **Consent on registration** — checkbox stored in `users.consent_given`
-- **Audit logging** — every data read/write logs `user_id`, `action`, `resource`, and `ip_address` to `audit_logs`
+- **Audit logging** — every data read/write logs `user_id`, `user_role`, `action`, `resource`, and `ip_address` to `audit_logs`
 - **HTTPS** — enforced in production via cloud platform
 - **CORS** — restricted to frontend origin in production
 
