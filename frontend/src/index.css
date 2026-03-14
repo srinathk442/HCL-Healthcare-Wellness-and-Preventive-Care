@@ -1,0 +1,11 @@
+@import "tailwindcss";
+
+@theme {
+  --color-medical-blue: #0ea5e9;
+  --color-success-green: #22c55e;
+  --color-danger-red: #ef4444;
+}
+
+body {
+  @apply bg-slate-50 text-slate-900;
+}
