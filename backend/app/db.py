@@ -16,7 +16,12 @@ def get_database() -> AsyncIOMotorDatabase:
 async def connect_to_mongo() -> None:
     global client, database
 
-    client = AsyncIOMotorClient(settings.mongodb_url)
+    # Longer timeouts for slow or restricted networks
+    client = AsyncIOMotorClient(
+        settings.mongodb_url,
+        serverSelectionTimeoutMS=60_000,
+        connectTimeoutMS=60_000,
+    )
     database = client[settings.database_name]
     await create_indexes()
 
