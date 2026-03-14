@@ -45,7 +45,8 @@ Healthcare providers can monitor patient compliance, view wellness goal progress
                    │ Motor (async)
 ┌──────────────────▼─────────────────────┐
 │               MongoDB                  │
-│  users │ profiles │ wellness_goals     │
+│  users │ patient_profiles              │
+│  provider_profiles │ wellness_goals    │
 │  goal_logs │ reminders │ audit_logs    │
 └────────────────────────────────────────┘
 ```
@@ -56,19 +57,20 @@ Healthcare providers can monitor patient compliance, view wellness goal progress
 
 ### Collections Overview
 
-| Collection          | Purpose                                              |
-|---------------------|------------------------------------------------------|
-| `users`             | Authentication credentials, role (patient/provider)  |
-| `profiles`          | Extended patient health info (allergies, meds, etc.) |
-| `wellness_goals`    | Goal definitions per patient (steps, water, sleep)   |
-| `goal_logs`         | Daily activity entries logged by patients            |
-| `reminders`         | Preventive care reminders (checkups, vaccinations)   |
-| `provider_patient`  | Many-to-many mapping of providers to patients        |
-| `audit_logs`        | HIPAA-style access logging for all data actions      |
+| Collection           | Owned By  | Purpose                                                  |
+|----------------------|-----------|----------------------------------------------------------|
+| `users`              | Both      | Auth credentials and `role` field for all users          |
+| `patient_profiles`   | Patient   | Health info — allergies, medications, blood type, etc.   |
+| `provider_profiles`  | Provider  | Professional info — specialization, license, clinic, etc.|
+| `wellness_goals`     | Patient   | Goal definitions per patient (steps, water, sleep)       |
+| `goal_logs`          | Patient   | Daily activity entries logged by patients                |
+| `reminders`          | Patient   | Preventive care reminders (checkups, vaccinations)       |
+| `provider_patient`   | Both      | Many-to-many mapping of providers to their patients      |
+| `audit_logs`         | Both      | HIPAA-style access logging for all data actions          |
 
-> **Role distinction:** A single `USERS` collection serves both patients and providers.
-> The `role` field (enum: `patient` | `provider`) controls access at the API level and
-> determines which relationships and dashboards are available to that user.
+> **Role distinction:** A single `USERS` collection stores credentials for everyone.
+> The `role` field (`patient` | `provider`) determines which profile collection
+> is populated on registration and which dashboards and API routes are accessible.
 
 ---
 
@@ -88,12 +90,15 @@ Healthcare providers can monitor patient compliance, view wellness goal progress
 }
 ```
 
-> `role` is set at registration and cannot be changed by the user.
-> All downstream collections reference this field to enforce access control:
-> - `role = patient` → has access to `profiles`, `wellness_goals`, `goal_logs`, `reminders`
-> - `role = provider` → has access to `provider_patient` assignments and read-only patient data
+> `role` is set at registration and cannot be changed.
+> On successful registration the backend automatically creates either a
+> `patient_profiles` or `provider_profiles` document linked to this user.
 
-#### `profiles`
+---
+
+#### `patient_profiles`
+> Created automatically when a user registers with `role = patient`.
+
 ```json
 {
   "_id": "ObjectId",
@@ -109,6 +114,27 @@ Healthcare providers can monitor patient compliance, view wellness goal progress
   "updated_at": "datetime"
 }
 ```
+
+---
+
+#### `provider_profiles`
+> Created automatically when a user registers with `role = provider`.
+
+```json
+{
+  "_id": "ObjectId",
+  "user_id": "ObjectId (ref: users where role=provider)",
+  "full_name": "string",
+  "phone": "string",
+  "specialization": "string (e.g. 'Cardiology', 'General Practice')",
+  "license_number": "string (unique)",
+  "hospital_or_clinic": "string",
+  "years_of_experience": "integer",
+  "updated_at": "datetime"
+}
+```
+
+---
 
 #### `wellness_goals`
 ```json
@@ -167,14 +193,11 @@ Healthcare providers can monitor patient compliance, view wellness goal progress
   "user_id": "ObjectId (ref: users)",
   "user_role": "enum: ['patient', 'provider']",
   "action": "string (e.g., 'VIEW_PROFILE', 'UPDATE_GOAL')",
-  "resource": "string (e.g., 'profiles', 'wellness_goals')",
+  "resource": "string (e.g., 'patient_profiles', 'wellness_goals')",
   "ip_address": "string",
   "timestamp": "datetime"
 }
 ```
-
-> `user_role` is stored directly on each audit log entry so the access trail is
-> self-contained and does not require a join back to `users` to understand who did what.
 
 ---
 
@@ -182,9 +205,9 @@ Healthcare providers can monitor patient compliance, view wellness goal progress
 
 > Rendered natively by GitHub — no plugins needed.
 >
-> **How to read the roles:** `USERS` is a single collection. The `role` field
-> (`patient` | `provider`) determines what each user can own or be linked to.
-> Relationships labelled `[patient]` or `[provider]` show which role that FK targets.
+> **How to read roles:** `USERS` is one collection for everyone. `role = patient`
+> links to `PATIENT_PROFILES`, wellness data, and reminders. `role = provider`
+> links to `PROVIDER_PROFILES` and patient assignments via `PROVIDER_PATIENT`.
 
 ```mermaid
 erDiagram
@@ -199,7 +222,7 @@ erDiagram
         datetime updated_at
     }
 
-    PROFILES {
+    PATIENT_PROFILES {
         ObjectId _id PK
         ObjectId user_id FK "ref: USERS(role=patient)"
         string full_name
@@ -210,6 +233,18 @@ erDiagram
         array current_medications
         string blood_type
         string emergency_contact
+        datetime updated_at
+    }
+
+    PROVIDER_PROFILES {
+        ObjectId _id PK
+        ObjectId user_id FK "ref: USERS(role=provider)"
+        string full_name
+        string phone
+        string specialization
+        string license_number UK
+        string hospital_or_clinic
+        int years_of_experience
         datetime updated_at
     }
 
@@ -261,18 +296,22 @@ erDiagram
         datetime timestamp
     }
 
-    USERS ||--|| PROFILES             : "patient has profile"
-    USERS ||--o{ WELLNESS_GOALS       : "patient owns goals"
-    USERS ||--o{ REMINDERS            : "patient has reminders"
-    USERS ||--o{ AUDIT_LOGS           : "user generates logs"
-    USERS ||--o{ PROVIDER_PATIENT     : "provider is assigned"
-    USERS ||--o{ PROVIDER_PATIENT     : "patient is assigned to"
-    WELLNESS_GOALS ||--o{ GOAL_LOGS   : "goal has daily entries"
+    USERS ||--|| PATIENT_PROFILES    : "patient has profile"
+    USERS ||--|| PROVIDER_PROFILES   : "provider has profile"
+    USERS ||--o{ WELLNESS_GOALS      : "patient owns goals"
+    USERS ||--o{ REMINDERS           : "patient has reminders"
+    USERS ||--o{ AUDIT_LOGS          : "user generates logs"
+    USERS ||--o{ PROVIDER_PATIENT    : "provider is assigned"
+    USERS ||--o{ PROVIDER_PATIENT    : "patient is assigned to"
+    WELLNESS_GOALS ||--o{ GOAL_LOGS  : "goal has daily entries"
 ```
 
 **Indexes:**
 - `users.email` — unique index
 - `users.role` — index for role-based filtering at the API layer
+- `patient_profiles.user_id` — unique index (one profile per patient)
+- `provider_profiles.user_id` — unique index (one profile per provider)
+- `provider_profiles.license_number` — unique index
 - `goal_logs.patient_id + log_date` — compound index for dashboard queries
 - `reminders.patient_id + due_date` — compound index for upcoming reminder queries
 - `audit_logs.user_id + timestamp` — compound index for audit trail queries
@@ -309,11 +348,17 @@ erDiagram
 | POST   | `/api/auth/login`     | Login and receive JWT token    |
 | POST   | `/api/auth/logout`    | Invalidate session             |
 
-### Profile
-| Method | Endpoint              | Description                    |
-|--------|-----------------------|--------------------------------|
-| GET    | `/api/profile/me`     | Get current user's profile     |
-| PUT    | `/api/profile/me`     | Update profile details         |
+### Patient Profile
+| Method | Endpoint                    | Description                     |
+|--------|-----------------------------|---------------------------------|
+| GET    | `/api/patient/profile/me`   | Get current patient's profile   |
+| PUT    | `/api/patient/profile/me`   | Update patient profile          |
+
+### Provider Profile
+| Method | Endpoint                    | Description                      |
+|--------|-----------------------------|----------------------------------|
+| GET    | `/api/provider/profile/me`  | Get current provider's profile   |
+| PUT    | `/api/provider/profile/me`  | Update provider profile          |
 
 ### Wellness Goals
 | Method | Endpoint                      | Description                        |
@@ -396,8 +441,9 @@ VITE_API_BASE_URL=http://localhost:8000
 ## Authentication & Security
 
 - **Password hashing** — bcrypt via `passlib`
-- **JWT tokens** — signed HS256 tokens with expiry, issued on login
-- **Role-based access control** — `role` field in JWT payload; every protected route checks role before granting access
+- **JWT tokens** — signed HS256 tokens with expiry; `role` is embedded in the payload so every route can enforce access without an extra DB lookup
+- **Role-based access control** — `patient` routes reject provider tokens and vice versa
+- **Profile auto-creation** — on registration, backend creates the correct profile document (`patient_profiles` or `provider_profiles`) based on `role`
 - **Consent on registration** — checkbox stored in `users.consent_given`
 - **Audit logging** — every data read/write logs `user_id`, `user_role`, `action`, `resource`, and `ip_address` to `audit_logs`
 - **HTTPS** — enforced in production via cloud platform
