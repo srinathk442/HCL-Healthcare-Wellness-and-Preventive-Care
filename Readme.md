@@ -167,17 +167,89 @@ Healthcare providers can monitor patient compliance, view wellness goal progress
 
 ### ER Diagram
 
-The interactive ER diagram is available at [`resources/healthcare_portal_erd.html`](resources/healthcare_portal_erd.html) — open it in any browser to explore the full entity-relationship diagram with all collections and their relationships.
+> Rendered natively by GitHub — no plugins needed.
 
-**Relationship summary:**
+```mermaid
+erDiagram
+    USERS {
+        ObjectId _id PK
+        string email UK
+        string password_hash
+        string role
+        boolean is_active
+        boolean consent_given
+        datetime created_at
+        datetime updated_at
+    }
 
-```
-USERS ||--|| PROFILES              (one patient → one extended profile)
-USERS ||--o{ WELLNESS_GOALS        (one patient → many goals)
-WELLNESS_GOALS ||--o{ GOAL_LOGS   (one goal → many daily log entries)
-USERS ||--o{ REMINDERS            (one patient → many care reminders)
-USERS ||--o{ PROVIDER_PATIENT     (providers and patients linked many-to-many)
-USERS ||--o{ AUDIT_LOGS           (every user generates audit entries)
+    PROFILES {
+        ObjectId _id PK
+        ObjectId user_id FK
+        string full_name
+        int age
+        string gender
+        string phone
+        array allergies
+        array current_medications
+        string blood_type
+        string emergency_contact
+        datetime updated_at
+    }
+
+    WELLNESS_GOALS {
+        ObjectId _id PK
+        ObjectId patient_id FK
+        string goal_type
+        float target_value
+        string unit
+        boolean is_active
+        datetime created_at
+    }
+
+    GOAL_LOGS {
+        ObjectId _id PK
+        ObjectId goal_id FK
+        ObjectId patient_id FK
+        float logged_value
+        date log_date
+        datetime created_at
+    }
+
+    REMINDERS {
+        ObjectId _id PK
+        ObjectId patient_id FK
+        string title
+        string description
+        date due_date
+        string status
+        string category
+        datetime created_at
+    }
+
+    PROVIDER_PATIENT {
+        ObjectId _id PK
+        ObjectId provider_id FK
+        ObjectId patient_id FK
+        datetime assigned_at
+        boolean is_active
+    }
+
+    AUDIT_LOGS {
+        ObjectId _id PK
+        ObjectId user_id FK
+        string action
+        string resource
+        string ip_address
+        datetime timestamp
+    }
+
+    USERS ||--|| PROFILES : "has"
+    USERS ||--o{ WELLNESS_GOALS : "owns"
+    USERS ||--o{ REMINDERS : "has"
+    USERS ||--o{ AUDIT_LOGS : "generates"
+    USERS ||--o{ PROVIDER_PATIENT : "assigned as provider"
+    USERS ||--o{ PROVIDER_PATIENT : "has as patient"
+    WELLNESS_GOALS ||--o{ GOAL_LOGS : "has entries"
 ```
 
 **Indexes:**
