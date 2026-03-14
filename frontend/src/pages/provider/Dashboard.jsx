@@ -1,21 +1,60 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Users, Search, ChevronRight } from 'lucide-react';
+import api, { getErrorMessage } from '../../api';
+import { useToast } from '../../contexts/ToastContext';
 
 const Dashboard = () => {
   const [patients, setPatients] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [loading, setLoading] = useState(true);
+  const { addToast } = useToast();
+
+  const loadPatients = useCallback(async () => {
+      setLoading(true);
+      try {
+        const { data } = await api.get('/provider/patients');
+        const enriched = await Promise.all(
+          data.map(async (patient) => {
+            try {
+              const complianceRes = await api.get(`/provider/patients/${patient.patient_id}/compliance`);
+              const compliance = complianceRes.data;
+              let complianceLabel = 'Needs Attention';
+              if (compliance.missed_reminders > 0) {
+                complianceLabel = 'Missed Reminder';
+              } else if (compliance.total_goals > 0 && compliance.goals_with_recent_log === compliance.total_goals) {
+                complianceLabel = 'On Track';
+              }
+
+              return {
+                ...patient,
+                complianceLabel,
+                pending_reminders: compliance.pending_reminders,
+              };
+            } catch {
+              return {
+                ...patient,
+                complianceLabel: 'Unknown',
+                pending_reminders: 0,
+              };
+            }
+          })
+        );
+        setPatients(enriched);
+      } catch (error) {
+        addToast(getErrorMessage(error, 'Failed to load assigned patients'), 'error');
+      } finally {
+        setLoading(false);
+      }
+  }, [addToast]);
 
   useEffect(() => {
-    // Mock API
-    setPatients([
-      { id: 1, name: 'Alice Smith', age: 45, condition: 'Hypertension', compliance: 'On Track' },
-      { id: 2, name: 'Bob Jones', age: 62, condition: 'Type 2 Diabetes', compliance: 'Missed Checkup' },
-      { id: 3, name: 'Charlie Davis', age: 31, condition: 'Asthma', compliance: 'On Track' },
-    ]);
-  }, []);
+    loadPatients();
+  }, [loadPatients]);
 
-  const filteredPatients = patients.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()));
+  const filteredPatients = patients.filter((p) =>
+    (p.full_name || p.email).toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
@@ -48,31 +87,31 @@ const Dashboard = () => {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-slate-50 text-slate-500 text-sm uppercase tracking-wider">
-                <th className="px-6 py-4 font-semibold">Patient Name</th>
-                <th className="px-6 py-4 font-semibold">Age</th>
-                <th className="px-6 py-4 font-semibold">Primary Condition</th>
+                <th className="px-6 py-4 font-semibold">Patient</th>
+                <th className="px-6 py-4 font-semibold">Email</th>
+                <th className="px-6 py-4 font-semibold">Assigned At</th>
                 <th className="px-6 py-4 font-semibold">Compliance Status</th>
                 <th className="px-6 py-4 font-semibold text-right">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {filteredPatients.map((patient) => (
-                <tr key={patient.id} className="hover:bg-slate-50/80 transition-colors group">
-                  <td className="px-6 py-4 font-bold text-slate-900">{patient.name}</td>
-                  <td className="px-6 py-4 text-slate-600 font-medium">{patient.age}</td>
-                  <td className="px-6 py-4 text-slate-600">{patient.condition}</td>
+                <tr key={patient.patient_id} className="hover:bg-slate-50/80 transition-colors group">
+                  <td className="px-6 py-4 font-bold text-slate-900">{patient.full_name || 'Unnamed Patient'}</td>
+                  <td className="px-6 py-4 text-slate-600 font-medium">{patient.email}</td>
+                  <td className="px-6 py-4 text-slate-600">{new Date(patient.assigned_at).toLocaleDateString()}</td>
                   <td className="px-6 py-4">
                     <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide ${
-                      patient.compliance === 'On Track' 
+                      patient.complianceLabel === 'On Track' 
                         ? 'bg-green-100 text-success-green border border-green-200' 
                         : 'bg-red-100 text-danger-red border border-red-200'
                     }`}>
-                      {patient.compliance}
+                      {patient.complianceLabel}
                     </span>
                   </td>
                   <td className="px-6 py-4 text-right">
                     <Link 
-                      to={`/provider/patient/${patient.id}`}
+                      to={`/provider/patient/${patient.patient_id}`}
                       className="inline-flex items-center justify-end gap-1 text-sm font-bold text-medical-blue hover:text-sky-700 opacity-0 group-hover:opacity-100 transition-opacity"
                     >
                       View Details <ChevronRight className="w-4 h-4" />
@@ -83,7 +122,7 @@ const Dashboard = () => {
               {filteredPatients.length === 0 && (
                 <tr>
                   <td colSpan="5" className="px-6 py-8 text-center text-slate-500 italic">
-                    No patients found matching your search.
+                    {loading ? 'Loading patients...' : 'No assigned patients found. Patient assignment API is not wired into the UI yet.'}
                   </td>
                 </tr>
               )}

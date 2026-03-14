@@ -1,8 +1,24 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ShieldCheck, Activity, Heart, Shield } from 'lucide-react';
+import api from '../../api';
 
 const Landing = () => {
+  const [tips, setTips] = useState([]);
+
+  useEffect(() => {
+    const loadTips = async () => {
+      try {
+        const { data } = await api.get('/public/health-info');
+        setTips(data.tips || []);
+      } catch (error) {
+        console.error('Failed to load public health info', error);
+      }
+    };
+
+    loadTips();
+  }, []);
+
   return (
     <div className="bg-slate-50 min-h-screen">
       {/* Hero Section */}
@@ -33,17 +49,17 @@ const Landing = () => {
           <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
             <Activity className="w-10 h-10 text-medical-blue mb-4" />
             <h3 className="text-xl font-bold text-slate-900 mb-2">Flu Prevention</h3>
-            <p className="text-slate-600">Get your annual flu shot. Wash your hands frequently with soap and water for at least 20 seconds. Avoid close contact with people who are sick.</p>
+            <p className="text-slate-600">{tips[0] || 'Get your annual flu shot and keep up with healthy daily habits.'}</p>
           </div>
           <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
             <Shield className="w-10 h-10 text-medical-blue mb-4" />
             <h3 className="text-xl font-bold text-slate-900 mb-2">COVID-19 Safety</h3>
-            <p className="text-slate-600">Stay up to date with vaccines. Improve ventilation in indoor spaces. Get tested if you have symptoms, and stay home if you are sick.</p>
+            <p className="text-slate-600">{tips[1] || 'Stay up to date with vaccines and seek care when symptoms appear.'}</p>
           </div>
           <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
             <Heart className="w-10 h-10 text-medical-blue mb-4" />
             <h3 className="text-xl font-bold text-slate-900 mb-2">Daily Wellness</h3>
-            <p className="text-slate-600">Aim for 150 minutes of moderate aerobic activity weekly. Drink plenty of water, and ensure you get 7-9 hours of quality sleep each night.</p>
+            <p className="text-slate-600">{tips[2] || 'Drink enough water, stay active, and aim for consistent sleep.'}</p>
           </div>
         </div>
       </section>

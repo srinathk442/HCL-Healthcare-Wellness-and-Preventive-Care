@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../contexts/ToastContext';
-import api from '../../api';
+import api, { getErrorMessage } from '../../api';
 
 const Login = () => {
   const [email, setEmail] = useState('');
@@ -17,43 +17,17 @@ const Login = () => {
     setLoading(true);
     try {
       const { data } = await api.post('/auth/login', { email, password });
-      login(data.user, data.token);
+      login({ email, role: data.role }, data.access_token);
       addToast('Logged in successfully!');
       
-      if (data.user.role === 'provider') {
+      if (data.role === 'provider') {
         navigate('/provider/dashboard');
       } else {
         navigate('/patient/dashboard');
       }
     } catch (error) {
       console.error(error);
-      // For demonstration, mock a login if API is missing (network err or 404)
-      if (error.code === 'ERR_NETWORK' || error.response?.status === 404) {
-        
-        // Search local storage for previously registered users
-        const mockUsers = JSON.parse(localStorage.getItem('mockUsers') || '[]');
-        const existingUser = mockUsers.find(u => u.email === email && u.password === password);
-
-        // Fallback: Default to legacy word search if no registered user found (for backwards compat)
-        const mockRole = existingUser ? existingUser.role : (email.toLowerCase().includes('provider') ? 'provider' : 'patient');
-        const mockUser = existingUser || { 
-          id: mockRole === 'provider' ? 99 : 1, 
-          email, 
-          name: mockRole === 'provider' ? 'Dr. Smith' : 'Test Patient', 
-          role: mockRole 
-        };
-        
-        login(mockUser, 'mock-jwt-token-123');
-        addToast(`Mock Login Successful (${mockRole})`, 'success');
-        
-        if (mockRole === 'provider') {
-           navigate('/provider/dashboard');
-        } else {
-           navigate('/patient/dashboard');
-        }
-      } else {
-        addToast(error.response?.data?.message || 'Invalid credentials', 'error');
-      }
+      addToast(getErrorMessage(error, 'Invalid credentials'), 'error');
     } finally {
       setLoading(false);
     }

@@ -1,27 +1,23 @@
 import axios from 'axios';
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || '/api',
+  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000/api',
   headers: {
     'Content-Type': 'application/json',
   },
 });
 
-// Request interceptor to attach the JWT token
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token');
     if (token) {
-      config.headers['Authorization'] = `Bearer ${token}`;
+      config.headers.Authorization = `Bearer ${token}`;
     }
     return config;
   },
-  (error) => {
-    return Promise.reject(error);
-  }
+  (error) => Promise.reject(error)
 );
 
-// Response interceptor for handling 401s globally
 api.interceptors.response.use(
   (response) => response,
   (error) => {
@@ -33,5 +29,16 @@ api.interceptors.response.use(
     return Promise.reject(error);
   }
 );
+
+export const getErrorMessage = (error, fallback = 'Something went wrong.') => {
+  const detail = error.response?.data?.detail;
+  if (typeof detail === 'string') {
+    return detail;
+  }
+  if (Array.isArray(detail)) {
+    return detail.map((item) => item.msg || item.detail || 'Validation error').join(', ');
+  }
+  return error.response?.data?.message || error.message || fallback;
+};
 
 export default api;

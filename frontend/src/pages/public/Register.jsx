@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useToast } from '../../contexts/ToastContext';
-import api from '../../api';
+import api, { getErrorMessage } from '../../api';
 
 const Register = () => {
   const [formData, setFormData] = useState({
-    name: '', email: '', password: '', role: 'patient', consent_given: false
+    email: '', password: '', role: 'patient', consent_given: false
   });
   const [loading, setLoading] = useState(false);
   const { addToast } = useToast();
@@ -27,20 +27,7 @@ const Register = () => {
       navigate('/login');
     } catch (error) {
       console.error(error);
-      if (error.code === 'ERR_NETWORK' || error.response?.status === 404) {
-        // Mock fallback: Save registered user to LocalStorage
-        const existingUsers = JSON.parse(localStorage.getItem('mockUsers') || '[]');
-        const newUser = {
-          id: Date.now(),
-          ...formData
-        };
-        localStorage.setItem('mockUsers', JSON.stringify([...existingUsers, newUser]));
-
-        addToast('Mock Registration Successful! Please login.', 'success');
-        navigate('/login');
-      } else {
-        addToast(error.response?.data?.message || 'Registration failed', 'error');
-      }
+      addToast(getErrorMessage(error, 'Registration failed'), 'error');
     } finally {
       setLoading(false);
     }
@@ -51,10 +38,6 @@ const Register = () => {
       <div className="max-w-md w-full bg-white p-8 rounded-2xl shadow-sm border border-slate-100">
         <h2 className="text-center text-3xl font-extrabold text-slate-900 mb-8">Create your account</h2>
         <form className="space-y-5" onSubmit={handleSubmit}>
-          <div>
-            <label className="block text-sm font-medium text-slate-700">Full Name</label>
-            <input type="text" name="name" required className="mt-1 block w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-medical-blue focus:border-medical-blue" value={formData.name} onChange={handleChange} />
-          </div>
           <div>
             <label className="block text-sm font-medium text-slate-700">Email address</label>
             <input type="email" name="email" required className="mt-1 block w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-medical-blue focus:border-medical-blue" value={formData.email} onChange={handleChange} />

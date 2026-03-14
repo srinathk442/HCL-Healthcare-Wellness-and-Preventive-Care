@@ -16,5 +16,13 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
+    @property
+    def frontend_origins(self) -> list[str]:
+        return [
+            origin.strip()
+            for origin in self.frontend_origin.split(",")
+            if origin.strip()
+        ]
+
 
 settings = Settings()
