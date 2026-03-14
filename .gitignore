@@ -1,0 +1,22 @@
+# Environment and secrets
+.env
+*.env
+!*.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+venv/
+.venv/
+env/
+
+# Node (if frontend in same repo)
+node_modules/
+
+# IDE / OS
+.idea/
+.vscode/
+*.swp
+.DS_Store
