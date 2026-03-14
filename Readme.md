@@ -167,7 +167,9 @@ Healthcare providers can monitor patient compliance, view wellness goal progress
 
 ### ER Diagram
 
-> See the interactive ER diagram in the project wiki or the `docs/er-diagram.png` file.
+The interactive ER diagram is available at [`resources/healthcare_portal_erd.html`](resources/healthcare_portal_erd.html) — open it in any browser to explore the full entity-relationship diagram with all collections and their relationships.
+
+**Relationship summary:**
 
 ```
 USERS ||--|| PROFILES              (one patient → one extended profile)
@@ -236,19 +238,16 @@ USERS ||--o{ AUDIT_LOGS           (every user generates audit entries)
 | PUT    | `/api/reminders/{id}/status`   | Mark a reminder as completed or missed   |
 
 ### Provider
-| Method | Endpoint                           | Description                          |
-|--------|------------------------------------|--------------------------------------|
-| GET    | `/api/provider/patients`           | List assigned patients               |
-| GET    | `/api/provider/patients/{id}`      | View a specific patient's data       |
-| GET    | `/api/provider/patients/{id}/compliance` | View patient compliance summary |
+| Method | Endpoint                                     | Description                          |
+|--------|----------------------------------------------|--------------------------------------|
+| GET    | `/api/provider/patients`                     | List assigned patients               |
+| GET    | `/api/provider/patients/{id}`                | View a specific patient's data       |
+| GET    | `/api/provider/patients/{id}/compliance`     | View patient compliance summary      |
 
 ### Public
-| Method | Endpoint              | Description                     |
-|--------|-----------------------|---------------------------------|
-| GET    | `/api/public/health-info` | Get public health info content |
-
----
-
+| Method | Endpoint                   | Description                     |
+|--------|----------------------------|---------------------------------|
+| GET    | `/api/public/health-info`  | Get public health info content  |
 
 ---
 
@@ -314,17 +313,14 @@ VITE_API_BASE_URL=http://localhost:8000
 
 ---
 
-
 ## Team
 
 | Name | Role |
 |------|------|
-| Varshan AVR (22BRS1060)  | Backend (FastAPI) |
-| Srinath Kamalakumar (22BCE1022)  | Backend (FastAPI) |
-| Nikhil Singh (22BEC1150)  | Frontend (React) |
-| Amirthakatesan (22BCE5212)  | Frontend (React) |
-
-
+| Varshan AVR (22BRS1060) | Backend (FastAPI) |
+| Srinath Kamalakumar (22BCE1022) | Backend (FastAPI) |
+| Nikhil Singh (22BEC1150) | Frontend (React) |
+| Amirthakatesan (22BCE5212) | Frontend (React) |
 
 ---
 
