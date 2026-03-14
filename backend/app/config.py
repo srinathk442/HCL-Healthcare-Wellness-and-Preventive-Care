@@ -2,7 +2,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    mongodb_url: str = "mongodb://localhost:27017"
+    mongodb_url: str
     database_name: str = "healthguard"
     jwt_secret_key: str = "change-me"
     jwt_algorithm: str = "HS256"
